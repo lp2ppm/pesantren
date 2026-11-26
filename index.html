@@ -595,6 +595,7 @@ body.hdr-warna .ukuran{border-left-color:rgba(255,255,255,.3)}
 /* dialog & toast */
 dialog.dlg{border:0;border-radius:var(--r3);padding:0;max-width:min(520px,92vw);width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);color:var(--tinta)}
 dialog.dlg::backdrop{background:rgba(13,26,20,.55)}
+dialog.dlg.lebar{max-width:min(900px,94vw)}
 .dlg-isi{padding:22px 24px}
 .dlg-isi h2{font-size:1.2rem;margin-bottom:10px}
 .dlg-aksi{display:flex;justify-content:flex-end;gap:10px;padding:0 24px 20px;flex-wrap:wrap}
@@ -1153,8 +1154,8 @@ const PUBLIC_ACTIONS = new Set(['ping', 'publicMeta', 'publicList', 'publicProfi
    Hasil baca dari server disimpan di sessionStorage (hilang saat tab ditutup), dikunci per pengguna + aksi + parameter.
    Setiap aksi tulis menghapus seluruh cache; tombol "Perbarui data" juga menghapusnya. */
 const CACHE_TTL = 5 * 60 * 1000, CACHE_PRE = 'lp2pp.c.', CACHE_MAKS = 400000;
-const CACHE_AKSI = new Set(['publicMeta', 'publicList', 'publicProfile', 'publicStats', 'publicKab', 'refKab', 'refKec', 'meta', 'get', 'list', 'stats', 'listUsers', 'reviewList', 'logList', 'listUndangan', 'rekapPembaruan', 'petaTitik']);
-const AKSI_TULIS = new Set(['update', 'create', 'verify', 'uploadDoc', 'deleteDoc', 'setSampul', 'saveUser', 'resetPassword', 'deleteUser', 'reviewMark', 'saveConfig', 'uploadAsset', 'simpanIsian', 'tambahIsian', 'buatUndangan', 'putuskanUndangan', 'changePassword', 'verifyBulk', 'petaSet', 'petaProses', 'setPemeliharaan']);
+const CACHE_AKSI = new Set(['publicMeta', 'publicList', 'publicProfile', 'publicStats', 'publicKab', 'refKab', 'refKec', 'meta', 'get', 'list', 'stats', 'listUsers', 'reviewList', 'logList', 'rekapPembaruan', 'petaTitik']);
+const AKSI_TULIS = new Set(['update', 'create', 'verify', 'uploadDoc', 'deleteDoc', 'setSampul', 'saveUser', 'resetPassword', 'deleteUser', 'reviewMark', 'saveConfig', 'uploadAsset', 'simpanIsian', 'tambahIsian', 'buatUndangan', 'putuskanUndangan', 'buatUndanganMassal', 'setujuiCocok', 'changePassword', 'verifyBulk', 'petaSet', 'petaProses', 'setPemeliharaan']);
 const cacheMem = {}, cacheJalan = {};
 function cacheKey(action, params) {
   const j = JSON.stringify(params || {}); let h = 5381; for (let i = 0; i < j.length; i++) h = ((h << 5) + h + j.charCodeAt(i)) | 0;
@@ -2209,11 +2210,12 @@ async function pageToken({ el, ok }) {
     kartu(`<h1 style="font-size:1.6rem">Data admin pesantren</h1>
       <div class="info" style="margin-top:12px"><b>${esc(d.nama_pesantren || d.id_pesantren)}</b><div class="kecil">${esc(d.id_pesantren)} · Token berlaku sampai ${esc(String(d.kadaluarsa || '').slice(0, 10))}</div></div>
       ${tolak ? `<div class="peringatan" style="margin-top:12px"><b>Pengajuan sebelumnya ditolak</b><div>${esc(d.catatan || '')}</div><div class="kecil">Perbaiki data di bawah, lalu kirim ulang.</div></div>` : ''}
-      <p class="muted" style="margin-top:12px">Semua kolom wajib diisi. Setelah dikirim, super admin LP2 PPM akan memeriksa dan menyetujui sebelum akun Anda aktif.</p>
+      <p class="muted" style="margin-top:12px">Semua kolom wajib diisi. Setelah dikirim, LP2 PPM akan memeriksa dan menyetujui sebelum akun Anda aktif.</p>
       <form id="f-und" novalidate>
         <div class="fl"><label for="u-em">Email admin <span class="wajib">*</span></label><input id="u-em" type="text" data-aturan="email" inputmode="email" autocapitalize="off" spellcheck="false" autocomplete="username" placeholder="nama@domain.com" value="${esc(d.email || '')}"><span class="hint">Email ini dipakai untuk masuk. Pakai email yang aktif.</span></div>
         <div class="fl"><label for="u-nm">Nama admin <span class="wajib">*</span></label><input id="u-nm" type="text" data-aturan="teks" autocomplete="name" value="${esc(d.nama_admin || '')}"><span class="hint">Nama lengkap pengelola data pesantren ini.</span></div>
-        <div class="fl"><label for="u-pd">Nama pondok <span class="wajib">*</span></label><input id="u-pd" type="text" data-aturan="teks" value="${esc(d.nama_pondok || d.nama_pesantren || '')}"><span class="hint">Tulis nama pondok sesuai papan nama. Super admin akan mencocokkannya dengan data terdaftar.</span></div>
+        <div class="fl"><label for="u-wa">Nomor WA aktif <span class="wajib">*</span></label><input id="u-wa" type="text" data-aturan="telp" inputmode="tel" autocomplete="tel" placeholder="0812 3456 7890" value="${esc(fmtWa(d.wa_pengaju || ''))}"><span class="hint">Satu nomor WhatsApp yang bisa dihubungi LP2 PPM. Sebaiknya nomor yang tadi menerima token.</span></div>
+        <div class="fl"><label for="u-pd">Nama pondok <span class="wajib">*</span></label><input id="u-pd" type="text" data-aturan="teks" value="${esc(d.nama_pondok || d.nama_pesantren || '')}"><span class="hint">Tulis nama pondok sesuai papan nama. LP2 PPM akan mencocokkannya dengan data terdaftar.</span></div>
         <div class="fl"><label for="u-pw">Buat password <span class="wajib">*</span></label><input id="u-pw" type="password" autocomplete="new-password"><span class="hint">Minimal 10 karakter, memuat huruf dan angka.</span></div>
         <div class="fl"><label for="u-pw2">Ulangi password <span class="wajib">*</span></label><input id="u-pw2" type="password" autocomplete="new-password"></div>
         <div id="u-err" class="galat" role="alert" style="margin:0;display:none"></div>
@@ -2228,11 +2230,11 @@ async function pageToken({ el, ok }) {
       er.style.display = 'none';
       const salah = periksaAturan($('#f-und'));
       if (salah.length) { tampil('Periksa isian yang bertanda merah.'); return; }
-      if (!$('#u-em').value.trim() || !$('#u-nm').value.trim() || !$('#u-pd').value.trim() || !$('#u-pw').value) { tampil('Semua kolom wajib diisi.'); return; }
+      if (!$('#u-em').value.trim() || !$('#u-nm').value.trim() || !$('#u-wa').value.trim() || !$('#u-pd').value.trim() || !$('#u-pw').value) { tampil('Semua kolom wajib diisi.'); return; }
       if ($('#u-pw').value !== $('#u-pw2').value) { tampil('Password dan ulangannya tidak sama.'); return; }
       b.disabled = true; b.textContent = 'Mengirim…';
       try {
-        await api('undanganKirim', { token: undBaca(), dev: perangkatId(), email: $('#u-em').value.trim(), nama_admin: $('#u-nm').value.trim(), nama_pondok: $('#u-pd').value.trim(), password: $('#u-pw').value });
+        await api('undanganKirim', { token: undBaca(), dev: perangkatId(), email: $('#u-em').value.trim(), nama_admin: $('#u-nm').value.trim(), wa: $('#u-wa').value.trim(), nama_pondok: $('#u-pd').value.trim(), password: $('#u-pw').value });
         layar(await api('undanganMasuk', { token: undBaca(), dev: perangkatId() }));
       } catch (x) { tampil(x.message); b.disabled = false; b.textContent = 'Kirim untuk disetujui'; }
     };
@@ -2240,8 +2242,8 @@ async function pageToken({ el, ok }) {
 
   const layarTunggu = d => {
     kartu(`<h1 style="font-size:1.6rem">Menunggu persetujuan</h1>
-      <div class="info" style="margin-top:12px"><b>Data Anda sudah terkirim.</b><div>Super admin LP2 PPM akan memeriksa lalu menyetujui. Setelah disetujui, Anda dapat masuk dengan email dan password yang baru Anda buat.</div></div>
-      <dl class="und-data" style="margin-top:14px"><dt>Pesantren</dt><dd>${esc(d.nama_pesantren)} (${esc(d.id_pesantren)})</dd><dt>Email admin</dt><dd>${esc(d.email)}</dd><dt>Nama admin</dt><dd>${esc(d.nama_admin)}</dd><dt>Nama pondok</dt><dd>${esc(d.nama_pondok)}</dd><dt>Dikirim</dt><dd>${esc(d.diajukan_pada)}</dd></dl>
+      <div class="info" style="margin-top:12px"><b>Data Anda sudah terkirim.</b><div>LP2 PPM akan memeriksa lalu menyetujui. Setelah disetujui, Anda dapat masuk dengan email dan password yang baru Anda buat.</div></div>
+      <dl class="und-data" style="margin-top:14px"><dt>Pesantren</dt><dd>${esc(d.nama_pesantren)} (${esc(d.id_pesantren)})</dd><dt>Email admin</dt><dd>${esc(d.email)}</dd><dt>Nama admin</dt><dd>${esc(d.nama_admin)}</dd><dt>Nomor WA</dt><dd>${esc(fmtWa(d.wa_pengaju))}</dd><dt>Nama pondok</dt><dd>${esc(d.nama_pondok)}</dd><dt>Dikirim</dt><dd>${esc(d.diajukan_pada)}</dd></dl>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px"><button class="btn" id="u-cek" type="button">Periksa status</button><button class="btn sek" id="u-batal" type="button">Tutup</button></div>`);
     $('#u-batal').onclick = keluarToken;
     $('#u-cek').onclick = async () => { try { const n = await api('undanganMasuk', { token: undBaca(), dev: perangkatId() }); if (n.status === 'diajukan') toast('Masih menunggu persetujuan.'); else layar(n); } catch (x) { toast(x.message, 'galat'); } };
@@ -2807,53 +2809,181 @@ const UND_STATUS = {
   aktif: ['biru', 'Menunggu diisi'], diajukan: ['emas', 'Menunggu persetujuan'], disetujui: ['', 'Disetujui'],
   ditolak: ['merah', 'Ditolak'], dicabut: ['abu', 'Dicabut'], kedaluwarsa: ['abu', 'Kedaluwarsa']
 };
-function undanganHtml(list) {
-  const urut = list.slice().sort((a, b) => (b.status === 'diajukan') - (a.status === 'diajukan'));
+const UND_WA_CHIP = { ya: ['', 'Nomor WA cocok'], tidak: ['merah', 'Nomor WA tidak cocok'], '': ['abu', 'Tanpa nomor pembanding'] };
+const fmtWa = n => String(n || '').replace(/^(\d{4})(\d{4})(\d{2,})$/, '$1 $2 $3');
+const fmtWaDaftar = t => String(t || '').split(' / ').filter(Boolean).map(fmtWa).join(' / ');
+function waLink(nomor, teks) {
+  const d = String(nomor || '').split(' / ')[0].replace(/\D/g, '').replace(/^0/, '62');
+  return d ? `https://wa.me/${d}?text=${encodeURIComponent(teks)}` : '';
+}
+function pesanUndangan(nama, token, kadaluarsa) {
+  const alamat = location.origin + location.pathname + '#/token';
+  return `Assalamualaikum. Berikut token undangan admin ${nama} di ${judulSitus()}.\nToken: ${token}\nBuka ${alamat} lalu isi data admin dan nomor WA Anda. Token berlaku sampai ${String(kadaluarsa).slice(0, 10)}.`;
+}
+function csvSel(v) {
+  let s = String(v == null ? '' : v);
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return '"' + s.replace(/"/g, '""') + '"';
+}
+function unduhCsv(nama, baris) {
+  const isi = '﻿' + baris.map(r => r.map(csvSel).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([isi], { type: 'text/csv;charset=utf-8' }));
+  a.download = nama; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+function undanganHtml(list, provinsi) {
   const n = list.filter(x => x.status === 'diajukan').length;
+  const k = list.filter(x => x.status === 'diajukan' && x.wa_cocok === 'ya').length;
+  const opsiHari = '<option value="7" selected>7 hari</option><option value="14">14 hari</option><option value="30">30 hari</option><option value="60">60 hari</option>';
   return `<section class="form-seksi seksi-tegas" id="und-bagian" style="margin-bottom:30px"><h2>Undangan admin pondok (token)</h2>
     <div style="padding:20px;background:var(--putih)">
-      <p class="muted" style="max-width:70ch">Buat token untuk satu pesantren, lalu berikan ke admin pesantren. Admin masuk lewat <b>Masuk → Masuk dengan token</b>, mengisi email, nama admin, nama pondok, dan password. Akun baru aktif setelah Anda menyetujuinya di sini.</p>
-      <div class="grid-form" style="padding:16px 0 0;grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto;align-items:end">
+      <p class="muted" style="max-width:70ch">Buat token, lalu kirim lewat WA ke pengurus pondok. Admin masuk lewat <b>Masuk → Masuk dengan token</b> dan mengisi email, nama, nama pondok, nomor WA, dan password. Cocokkan nomor WA pengaju dengan penerima token (dan chat WA Anda), lalu setujui. Akun baru aktif setelah disetujui.</p>
+      <h3 style="margin-top:18px;font-size:1.05rem">Token untuk satu pesantren</h3>
+      <div class="grid-form" style="padding:10px 0 0;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));align-items:end">
         <div class="fl ac" id="und-pes-bungkus"><label for="und-pes">Pesantren</label><input id="und-pes" type="text" placeholder="Ketik nama pesantren…" autocomplete="off"><input id="und-pes-id" type="hidden"></div>
-        <div class="fl"><label for="und-hari">Masa berlaku</label><select id="und-hari"><option value="7">7 hari</option><option value="14" selected>14 hari</option><option value="30">30 hari</option><option value="60">60 hari</option></select></div>
+        <div class="fl"><label for="und-pn">Nama penerima (opsional)</label><input id="und-pn" type="text" maxlength="100" autocomplete="off"></div>
+        <div class="fl"><label for="und-pw">WA penerima (opsional)</label><input id="und-pw" type="text" inputmode="tel" maxlength="40" placeholder="0812 3456 7890" autocomplete="off"></div>
+        <div class="fl"><label for="und-hari">Masa berlaku</label><select id="und-hari">${opsiHari}</select></div>
         <button class="btn" type="button" id="und-buat">Buat token</button>
       </div>
       <div id="und-err" class="galat" role="alert" style="display:none;margin:12px 0 0"></div>
-      ${n ? `<div class="peringatan" style="margin-top:18px"><b>${n} pengajuan menunggu keputusan Anda.</b> Periksa datanya di bawah, lalu setujui atau tolak.</div>` : ''}
-      <div style="display:grid;gap:12px;margin-top:18px">
-      ${urut.length ? urut.map(o => { const st = UND_STATUS[o.status] || ['abu', o.status]; const beda = o.nama_pondok && o.nama_pesantren && o.nama_pondok.trim().toLowerCase() !== o.nama_pesantren.trim().toLowerCase();
-        return `<div class="und-item ${o.status === 'diajukan' ? 'perlu' : ''}"><div class="und-kepala"><b>${esc(o.nama_pesantren || o.id_pesantren)}</b><span class="chip ${st[0]}">${esc(st[1])}</span></div>
-          <dl class="und-data"><dt>ID</dt><dd>${esc(o.id_pesantren)} · ${esc(o.id_undangan)}</dd><dt>Dibuat</dt><dd>${esc(o.dibuat_pada)} oleh ${esc(o.dibuat_oleh)}; berlaku sampai ${esc(String(o.kadaluarsa).slice(0, 10))}</dd>
-          ${o.email ? `<dt>Email admin</dt><dd>${esc(o.email)}</dd><dt>Nama admin</dt><dd>${esc(o.nama_admin)}</dd><dt>Nama pondok (diisi)</dt><dd class="${beda ? 'beda' : ''}">${esc(o.nama_pondok)}${beda ? ' (berbeda dari data terdaftar)' : ''}</dd><dt>Nama terdaftar</dt><dd>${esc(o.nama_pesantren)}</dd><dt>Dikirim</dt><dd>${esc(o.diajukan_pada)}</dd>` : ''}
-          ${o.catatan ? `<dt>Catatan</dt><dd>${esc(o.catatan)}</dd>` : ''}</dl>
-          <div class="und-aksi">${o.status === 'diajukan' ? `<button class="btn kecil" data-und="setuju" data-id="${esc(o.id_undangan)}" data-e="${esc(o.email)}">Setujui dan aktifkan akun</button><button class="btn bahaya kecil" data-und="tolak" data-id="${esc(o.id_undangan)}">Tolak</button>` : ''}${['aktif', 'diajukan', 'ditolak'].includes(o.status) ? `<button class="btn sek kecil" data-und="cabut" data-id="${esc(o.id_undangan)}">Cabut token</button>` : ''}</div></div>`; }).join('') : '<p class="muted">Belum ada undangan.</p>'}
-      </div></div></section>`;
+      <h3 style="margin-top:22px;font-size:1.05rem">Token massal per provinsi</h3>
+      <p class="kecil muted" style="max-width:70ch">Membuat token untuk semua pesantren di provinsi (atau satu kabupaten/kota) yang belum punya akun atau token berjalan. Nomor penerima diambil dari data pesantren (admin pesantren, lalu HP mudir). Maksimal 100 token sekali klik; klik lagi untuk melanjutkan.</p>
+      <div class="grid-form" style="padding:10px 0 0;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));align-items:end">
+        <div class="fl"><label for="und-m-prov">Provinsi</label><select id="und-m-prov"><option value="">Pilih provinsi…</option>${(provinsi || []).map(p => `<option>${esc(p.nilai)}</option>`).join('')}</select></div>
+        <div class="fl"><label for="und-m-kab">Kabupaten/kota (opsional)</label><select id="und-m-kab"><option value="">Semua kabupaten/kota</option></select></div>
+        <div class="fl"><label for="und-m-hari">Masa berlaku</label><select id="und-m-hari">${opsiHari}</select></div>
+        <button class="btn" type="button" id="und-m-buat">Buat token massal</button>
+      </div>
+      <div id="und-m-err" class="galat" role="alert" style="display:none;margin:12px 0 0"></div>
+      ${n ? `<div class="peringatan" style="margin-top:22px"><b>${n} pengajuan menunggu keputusan.</b> ${k ? `${k} di antaranya nomor WA-nya cocok dengan penerima token.` : 'Periksa datanya di bawah, lalu setujui atau tolak.'}${k ? `<div style="margin-top:10px"><button class="btn kecil" type="button" id="und-setuju-cocok">Setujui semua yang cocok (${k})</button></div>` : ''}</div>` : ''}
+      <div class="grid-form" style="padding:20px 0 0;grid-template-columns:minmax(0,1fr) minmax(0,2fr);align-items:end">
+        <div class="fl"><label for="und-f-st">Tampilkan</label><select id="und-f-st"><option value="semua">Semua status</option>${Object.keys(UND_STATUS).map(s => `<option value="${s}">${esc(UND_STATUS[s][1])}</option>`).join('')}</select></div>
+        <div class="fl"><label for="und-f-cari">Cari pesantren atau email</label><input id="und-f-cari" type="text" autocomplete="off" placeholder="Ketik untuk menyaring…"></div>
+      </div>
+      <div id="und-daftar" style="display:grid;gap:12px;margin-top:14px"></div>
+      <div id="und-lagi" style="margin-top:12px"></div>
+    </div></section>`;
 }
-function pasangUndangan(el) {
+
+function undKartu(o) {
+  const st = UND_STATUS[o.status] || ['abu', o.status];
+  const beda = o.nama_pondok && o.nama_pesantren && o.nama_pondok.trim().toLowerCase() !== o.nama_pesantren.trim().toLowerCase();
+  const wc = UND_WA_CHIP[o.wa_cocok || ''];
+  return `<div class="und-item ${o.status === 'diajukan' ? 'perlu' : ''}"><div class="und-kepala"><b>${esc(o.nama_pesantren || o.id_pesantren)}</b><span class="chip ${st[0]}">${esc(st[1])}</span></div>
+    <dl class="und-data"><dt>ID</dt><dd>${esc(o.id_pesantren)} · ${esc(o.id_undangan)}</dd><dt>Dibuat</dt><dd>${esc(o.dibuat_pada)} oleh ${esc(o.dibuat_oleh)}; berlaku sampai ${esc(String(o.kadaluarsa).slice(0, 10))}</dd>
+    ${o.penerima_wa || o.penerima_nama ? `<dt>Penerima token</dt><dd>${esc(o.penerima_nama)}${o.penerima_nama && o.penerima_wa ? ' · ' : ''}${esc(fmtWaDaftar(o.penerima_wa))}</dd>` : ''}
+    ${o.email ? `<dt>Email admin</dt><dd>${esc(o.email)}</dd><dt>Nama admin</dt><dd>${esc(o.nama_admin)}</dd><dt>WA pengaju</dt><dd class="${o.wa_cocok === 'tidak' ? 'beda' : ''}">${esc(fmtWa(o.wa_pengaju)) || '—'} <span class="chip ${wc[0]}">${esc(wc[1])}</span></dd><dt>Nama pondok (diisi)</dt><dd class="${beda ? 'beda' : ''}">${esc(o.nama_pondok)}${beda ? ' (berbeda dari data terdaftar)' : ''}</dd><dt>Nama terdaftar</dt><dd>${esc(o.nama_pesantren)}</dd><dt>Dikirim</dt><dd>${esc(o.diajukan_pada)}</dd>` : ''}
+    ${o.catatan ? `<dt>Catatan</dt><dd>${esc(o.catatan)}</dd>` : ''}</dl>
+    <div class="und-aksi">${o.status === 'diajukan' ? `<button class="btn kecil" data-und="setuju" data-id="${esc(o.id_undangan)}" data-e="${esc(o.email)}">Setujui dan aktifkan akun</button><button class="btn bahaya kecil" data-und="tolak" data-id="${esc(o.id_undangan)}">Tolak</button>` : ''}${['aktif', 'diajukan', 'ditolak'].includes(o.status) ? `<button class="btn sek kecil" data-und="cabut" data-id="${esc(o.id_undangan)}">Cabut token</button>` : ''}</div></div>`;
+}
+
+function pasangUndangan(el, list, provinsi) {
   pasangAutocomplete($('#und-pes-bungkus'), '#und-pes', '#und-pes-id');
+  const nPending = list.filter(x => x.status === 'diajukan').length;
+  $('#und-f-st').value = nPending ? 'diajukan' : 'semua';
+  let batas = 30;
+  const gambar = () => {
+    const st = $('#und-f-st').value, q = $('#und-f-cari').value.trim().toLowerCase();
+    const l = list.filter(x => (st === 'semua' || x.status === st) && (!q || `${x.nama_pesantren} ${x.id_pesantren} ${x.email}`.toLowerCase().includes(q)))
+      .sort((a, b) => (b.status === 'diajukan') - (a.status === 'diajukan'));
+    $('#und-daftar').innerHTML = l.length ? l.slice(0, batas).map(undKartu).join('') : '<p class="muted">Tidak ada undangan yang cocok dengan penyaringan ini.</p>';
+    $('#und-lagi').innerHTML = l.length > batas ? `<button class="btn sek" type="button" id="und-lagi-btn">Tampilkan lebih banyak (${l.length - batas} tersisa)</button>` : '';
+    const lg = $('#und-lagi-btn'); if (lg) lg.onclick = () => { batas += 30; gambar(); };
+  };
+  $('#und-f-st').onchange = () => { batas = 30; gambar(); };
+  $('#und-f-cari').oninput = () => { batas = 30; gambar(); };
+  gambar();
+
+  const salin = (t, m) => (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast(m), () => toast('Salin manual dari kotak kuning.', 'galat'));
+
   $('#und-buat').onclick = async () => {
     const er = $('#und-err'); er.style.display = 'none';
     if (!$('#und-pes-id').value) { er.textContent = 'Pilih pesantren dari daftar yang muncul saat Anda mengetik.'; er.style.display = 'block'; return; }
     const b = $('#und-buat'); b.disabled = true;
     try {
-      const r = await api('buatUndangan', { id_pesantren: $('#und-pes-id').value, hari: $('#und-hari').value });
-      const alamat = location.origin + location.pathname + '#/token';
-      const pesan = `Assalamualaikum. Berikut token undangan admin ${r.nama_pesantren} di ${judulSitus()}.\nToken: ${r.token}\nBuka ${alamat} lalu isi data admin. Token berlaku sampai ${String(r.kadaluarsa).slice(0, 10)}.`;
+      const r = await api('buatUndangan', { id_pesantren: $('#und-pes-id').value, hari: $('#und-hari').value, penerima_nama: $('#und-pn').value.trim(), penerima_wa: $('#und-pw').value.trim() });
+      const pesan = pesanUndangan(r.nama_pesantren, r.token, r.kadaluarsa), wl = waLink(r.penerima_wa, pesan);
       const d = modal(`<div class="dlg-isi"><h2>Token undangan dibuat</h2><p>Untuk <b>${esc(r.nama_pesantren)}</b> (${esc(r.id_pesantren)}). Berlaku sampai ${esc(String(r.kadaluarsa).slice(0, 10))}.</p>
         <div class="rahasia tokenbox">${esc(r.token)}</div>
+        ${r.penerima_wa ? `<p class="kecil">Penerima tercatat: ${esc(r.penerima_nama)}${r.penerima_nama ? ' · ' : ''}${esc(fmtWaDaftar(r.penerima_wa))}</p>` : '<p class="kecil muted">Penerima tidak dicatat, jadi pengajuan nanti tidak bisa dicocokkan otomatis.</p>'}
         <p class="kecil muted">Token hanya tampil sekali dan tersimpan sebagai hash. Token lama untuk pesantren ini otomatis dicabut.</p></div>
-        <div class="dlg-aksi"><button class="btn sek" data-x="token">Salin token</button><button class="btn sek" data-x="pesan">Salin pesan undangan</button><button class="btn" data-x="tutup">Selesai</button></div>`);
-      const salin = (t, m) => (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast(m), () => toast('Salin manual dari kotak kuning.', 'galat'));
+        <div class="dlg-aksi"><button class="btn sek" data-x="token">Salin token</button><button class="btn sek" data-x="pesan">Salin pesan undangan</button>${wl ? `<a class="btn sek" href="${esc(wl)}" target="_blank" rel="noopener noreferrer">Kirim lewat WA</a>` : ''}<button class="btn" data-x="tutup">Selesai</button></div>`);
       d.addEventListener('click', e => { const x = e.target.closest('[data-x]'); if (!x) return; if (x.dataset.x === 'token') salin(r.token, 'Token disalin.'); else if (x.dataset.x === 'pesan') salin(pesan, 'Pesan undangan disalin.'); else d.close(); });
       d.addEventListener('close', () => render());
     } catch (x) { if (!x.ditangani) { er.textContent = x.message; er.style.display = 'block'; } b.disabled = false; }
   };
+
+  /* token massal */
+  $('#und-m-prov').onchange = async () => {
+    const pv = $('#und-m-prov').value, sel = $('#und-m-kab');
+    sel.innerHTML = '<option value="">Semua kabupaten/kota</option>';
+    if (!pv) return;
+    try { const l = await api('refKab', { provinsi: pv }); sel.innerHTML = '<option value="">Semua kabupaten/kota</option>' + l.map(x => `<option value="${esc(x.kode)}">${esc(x.nama)}</option>`).join(''); } catch (e) { }
+  };
+  $('#und-m-buat').onclick = async () => {
+    const er = $('#und-m-err'); er.style.display = 'none';
+    const prov = $('#und-m-prov').value, kabSel = $('#und-m-kab'), kab = kabSel.value, kabTeks = kab && kabSel.selectedOptions[0] ? kabSel.selectedOptions[0].textContent : '';
+    if (!prov) { er.textContent = 'Pilih provinsi terlebih dahulu.'; er.style.display = 'block'; return; }
+    if (!await konfirmasi('Buat token massal?', `Token dibuat untuk pesantren di ${kabTeks ? kabTeks + ', ' : ''}${prov} yang belum punya akun atau token berjalan (maksimal 100 sekali klik). Token hanya tampil sekali setelah ini, jadi unduh daftarnya.`, 'Buat token')) return;
+    const b = $('#und-m-buat'); b.disabled = true; b.textContent = 'Membuat token…';
+    try {
+      const r = await api('buatUndanganMassal', { provinsi: prov, kode_kab: kab, hari: $('#und-m-hari').value });
+      b.disabled = false; b.textContent = 'Buat token massal';
+      if (!r.dibuat) { er.textContent = r.pesan + (r.dilewati ? ` (Sudah punya akun: ${r.dilewati.sudah_akun}; token masih berjalan: ${r.dilewati.token_berjalan}.)` : ''); er.style.display = 'block'; return; }
+      hasilMassal(r, prov);
+    } catch (x) { if (!x.ditangani) { er.textContent = x.message; er.style.display = 'block'; } b.disabled = false; b.textContent = 'Buat token massal'; }
+  };
+  function hasilMassal(r, prov) {
+    const tgl = String(r.kadaluarsa).slice(0, 10);
+    const pesanDari = o => pesanUndangan(o.nama_pesantren, o.token, r.kadaluarsa);
+    const baris = r.item.map(o => { const wl = waLink(o.penerima_wa, pesanDari(o));
+      return `<tr><td>${esc(o.nama_pesantren)}<div class="muted kecil">${esc(o.kab_kota)}</div></td><td><code style="font-weight:700;letter-spacing:.04em;white-space:nowrap">${esc(o.token)}</code></td><td>${o.penerima_wa ? `${esc(o.penerima_nama)}<div class="kecil">${esc(fmtWaDaftar(o.penerima_wa))}</div>` : '<span class="muted kecil">Tidak ada nomor di data</span>'}</td><td>${wl ? `<a class="btn sek kecil" href="${esc(wl)}" target="_blank" rel="noopener noreferrer">Kirim WA</a>` : ''}</td></tr>`; }).join('');
+    const d = modal(`<div class="dlg-isi"><h2>${r.dibuat} token dibuat</h2>
+      <p>${esc(prov)}. Berlaku sampai ${esc(tgl)}. ${r.dilewati ? `Dilewati: ${r.dilewati.sudah_akun} sudah punya akun, ${r.dilewati.token_berjalan} masih punya token berjalan.` : ''}${r.sisa ? ` Masih ada <b>${r.sisa}</b> pesantren lagi; klik Buat token massal sekali lagi setelah menyimpan daftar ini.` : ''}</p>
+      <div class="peringatan" style="margin:10px 0"><b>Token hanya tampil sekali.</b> Unduh daftar sekarang, kirim ke tiap penerima lewat WA pribadi (bukan grup), lalu hapus berkasnya.</div>
+      <div class="tabel-bungkus" style="max-height:44vh;overflow:auto"><table class="tbl"><thead><tr><th>Pesantren</th><th>Token</th><th>Penerima</th><th></th></tr></thead><tbody>${baris}</tbody></table></div></div>
+      <div class="dlg-aksi"><button class="btn sek" data-x="csv">Unduh daftar (CSV)</button><button class="btn" data-x="tutup">Selesai</button></div>`);
+    d.classList.add('lebar');
+    d.addEventListener('click', e => {
+      const x = e.target.closest('[data-x]'); if (!x) return;
+      if (x.dataset.x === 'csv') {
+        const hari = new Date().toISOString().slice(0, 10);
+        unduhCsv(`token-undangan-${prov.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${hari}.csv`,
+          [['id_pesantren', 'nama_pesantren', 'provinsi', 'kab_kota', 'token', 'berlaku_sampai', 'penerima_nama', 'penerima_wa', 'pesan_wa']]
+            .concat(r.item.map(o => [o.id_pesantren, o.nama_pesantren, o.provinsi, o.kab_kota, o.token, tgl, o.penerima_nama, fmtWaDaftar(o.penerima_wa), pesanDari(o)])));
+      } else d.close();
+    });
+    d.addEventListener('close', () => render());
+  }
+
+  /* setujui semua yang nomor WA-nya cocok */
+  const sc = $('#und-setuju-cocok');
+  if (sc) sc.onclick = async () => {
+    const cocok = list.filter(x => x.status === 'diajukan' && x.wa_cocok === 'ya');
+    const beda = cocok.filter(o => o.nama_pondok && o.nama_pesantren && o.nama_pondok.trim().toLowerCase() !== o.nama_pesantren.trim().toLowerCase()).length;
+    if (!await konfirmasi(`Setujui ${cocok.length} pengajuan?`, `Nomor WA pengaju sama dengan nomor penerima token. Akun admin pondok dibuat dan terikat ke pesantren masing-masing. Email dan nama pondok tidak diperiksa otomatis${beda ? `; ${beda} pengajuan mengisi nama pondok yang berbeda dari data terdaftar, sebaiknya Anda periksa dulu` : ''}.`, 'Setujui semua')) return;
+    const ids = cocok.map(x => x.id_undangan); let ok = 0, lewat = 0;
+    sc.disabled = true;
+    try {
+      for (let i = 0; i < ids.length; i += 20) {
+        sc.textContent = `Memproses ${Math.min(i + 20, ids.length)} dari ${ids.length}…`;
+        const r = await api('setujuiCocok', { ids: ids.slice(i, i + 20) });
+        ok += r.disetujui; lewat += r.dilewati.length;
+      }
+      toast(`${ok} pengajuan disetujui${lewat ? `, ${lewat} dilewati` : ''}.`);
+    } catch (x) { if (!x.ditangani) toast(x.message, 'galat'); }
+    render();
+  };
+
   $('#und-bagian').addEventListener('click', async e => {
     const t = e.target.closest('[data-und]'); if (!t) return;
     const k = t.dataset.und, id = t.dataset.id;
     try {
       if (k === 'setuju') {
-        if (!await konfirmasi('Setujui pengajuan?', `Akun ${t.dataset.e} dibuat sebagai admin pondok dan terikat ke pesantren ini. Pastikan email, nama admin, dan nama pondok sudah benar.`, 'Setujui dan aktifkan')) return;
+        if (!await konfirmasi('Setujui pengajuan?', `Akun ${t.dataset.e} dibuat sebagai admin pondok dan terikat ke pesantren ini. Pastikan email, nama admin, nomor WA, dan nama pondok sudah benar.`, 'Setujui dan aktifkan')) return;
         const r = await api('putuskanUndangan', { id_undangan: id, keputusan: 'setuju' }); toast(r.pesan); render();
       } else if (k === 'cabut') {
         if (!await konfirmasi('Cabut token?', 'Token ini tidak bisa dipakai lagi. Admin pondok perlu token baru.', 'Cabut token', true)) return;
@@ -2876,8 +3006,8 @@ async function pagePengguna({ el, ok }) {
   if (!perluStaf(el)) return;
   document.title = 'Pengguna — Panel';
   el.innerHTML = muat();
-  const sa = S.user.role === 'superadmin';
-  const [users, und, metaP] = await Promise.all([api('listUsers'), sa ? api('listUndangan') : Promise.resolve([]), api('meta')]);
+  const sa = S.user.role === 'superadmin', kelolaUnd = sa || S.user.role === 'operator';
+  const [users, und, metaP] = await Promise.all([api('listUsers'), kelolaUnd ? api('listUndangan') : Promise.resolve([]), api('meta')]);
   if (!ok()) return;
   const rl = S.user.role;
   const perans = sa ? ['superadmin', 'operator', 'operator_wilayah', 'operator_daerah', 'admin_pondok', 'viewer']
@@ -2890,7 +3020,7 @@ async function pagePengguna({ el, ok }) {
   const wilTeks = u => u.role === 'operator_wilayah' ? esc(u.wilayah_prov) : u.role === 'operator_daerah' ? esc(kabNama[u.wilayah_kab] || u.wilayah_kab) + '<div class="muted kecil">' + esc(u.wilayah_prov) + '</div>' : '';
   const pesanSaya = u => u.id_user === S.user.id_user;
   el.innerHTML = `<div class="wrap"><div class="judul-hal"><h1 style="font-size:clamp(1.5rem,3vw,2.1rem)">Pengguna</h1></div>${tabPanel('/panel/pengguna')}
-    ${sa ? undanganHtml(und) : ''}
+    ${kelolaUnd ? undanganHtml(und, metaP.provinsi) : ''}
     <form class="form-seksi seksi-tegas" id="f-user" novalidate style="margin-bottom:30px"><h2>Buat akun baru</h2><div class="grid-form">
       <div class="fl"><label for="u-email">Email</label><input id="u-email" type="email" autocomplete="off"></div>
       <div class="fl"><label for="u-nama">Nama</label><input id="u-nama" type="text" autocomplete="off"></div>
@@ -2906,7 +3036,7 @@ async function pagePengguna({ el, ok }) {
       <td class="nowrap">${pesanSaya(u) ? '<span class="muted kecil">Akun Anda</span>' : `<button class="btn sek kecil" type="button" data-reset="${esc(u.id_user)}" data-e="${esc(u.email)}">Reset password</button> <button class="btn ${u.aktif ? 'bahaya' : 'sek'} kecil" type="button" data-aktif="${esc(u.id_user)}" data-to="${u.aktif ? '0' : '1'}">${u.aktif ? 'Nonaktifkan' : 'Aktifkan'}</button> <button class="btn bahaya kecil" type="button" data-hapus-akun="${esc(u.id_user)}" data-e="${esc(u.email)}" aria-label="Hapus akun ${esc(u.email)}">Hapus</button>`}</td></tr>`).join('')}
     </tbody></table></div></div>`;
   pasangAutocomplete($('#u-pes-bungkus'), '#u-pes', '#u-pes-id');
-  if (sa) pasangUndangan(el);
+  if (kelolaUnd) pasangUndangan(el, und, metaP.provinsi);
   const tg = () => {
     const r = $('#u-role').value;
     $('#u-pes-bungkus').style.display = r === 'admin_pondok' ? '' : 'none';
