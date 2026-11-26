@@ -4,7 +4,9 @@ Aplikasi web untuk mengelola dan menampilkan data pesantren Muhammadiyah se-Indo
 
 Pengunjung umum dapat melihat direktori, statistik, dan peta sebaran pesantren. Admin pesantren memperbarui data lembaganya sendiri. Operator LP2 PPM di tingkat pusat, wilayah, dan daerah memeriksa kelengkapan data, memverifikasi, dan memantau pesantren yang datanya sudah lama tidak diperbarui.
 
-> Status: aktif dikembangkan. Backend versi 1.9.0.
+Alamat: **https://pesantren.muhammadiyah.or.id**
+
+> Status: aktif dikembangkan, belum diluncurkan resmi. Backend versi 1.14.0.
 
 ## Fitur
 
@@ -24,10 +26,11 @@ Pengunjung umum dapat melihat direktori, statistik, dan peta sebaran pesantren. 
 - **Pemantauan data**: kapan tiap pesantren terakhir memperbarui datanya, dikelompokkan menurut usia data, untuk menemukan data yang mungkin sudah usang.
 - **Hubungi lewat WhatsApp** langsung ke mudir dan admin pondok, dengan pesan yang menyebut isian yang masih kosong.
 - **Titik peta**: membaca koordinat dari tautan Google Maps yang diisi pesantren, termasuk tautan pendek, dan mengisi manual bila tidak terbaca.
-- Pengelolaan akun, tinjauan data hasil migrasi, dan riwayat perubahan.
+- Pengelolaan akun (membuat, mereset, menonaktifkan, dan menghapus akun sesuai kewenangan), tinjauan data hasil migrasi, dan riwayat perubahan.
 
 **Untuk super admin**
 - Kelola isian (kolom formulir) dan pengaturan tampilan situs.
+- **Token undangan**: pendaftaran admin pondok lewat token sekali pakai berbatas waktu. Calon admin mengisi sendiri, lalu super admin memeriksa dan menyetujui.
 - **Mode pemeliharaan** saat tim memperbarui fitur. Akses pengguna lain ditolak di server.
 
 ## Peran pengguna
@@ -63,6 +66,8 @@ Google Apps Script (Web App)  ──►  Google Sheets (database)
 ```
 index.html     aplikasi (frontend)
 batas/         batas provinsi (JSON, per provinsi) untuk peta titik pondok
+warna.png      logo
+CNAME          nama domain khusus (dibuat otomatis oleh GitHub Pages; jangan dihapus)
 README.md      dokumen ini
 ```
 
@@ -76,21 +81,28 @@ Kode backend (`Code.gs`) dipasang langsung di Apps Script dan tidak disimpan di 
 4. **Deploy backend.** *Deploy > New deployment > Web app*, `Execute as: Me`, `Who has access: Anyone`. Salin URL `/exec`.
 5. **Frontend.** Isi `CONFIG.API_URL` di `index.html` dengan URL tersebut.
 6. **Hosting.** Aktifkan GitHub Pages untuk repositori ini (*Settings > Pages*). Pastikan folder `batas/` ikut terunggah sejajar dengan `index.html`.
-7. **Cadangan.** Jalankan `pasangCadangan` untuk cadangan otomatis mingguan.
-8. **Peta titik.** Setelah data masuk, buka *Panel > Titik peta* lalu klik **Proses tautan Maps**. Apps Script akan meminta izin koneksi ke layanan eksternal, setujui sekali.
+7. **Domain khusus.** Subdomain disediakan IT Pimpinan Pusat Muhammadiyah (rekam CNAME ke akun GitHub LP2 PPM, hanya DNS). Isi *Custom domain* di *Settings > Pages* dan aktifkan *Enforce HTTPS*. Bila aplikasi tidak dipakai lagi, beri tahu IT pusat agar CNAME dihapus.
+8. **Cadangan.** Jalankan `pasangCadangan` untuk cadangan otomatis mingguan.
+9. **Peta titik.** Setelah data masuk, buka *Panel > Titik peta* lalu klik **Proses tautan Maps**. Apps Script akan meminta izin koneksi ke layanan eksternal, setujui sekali.
+10. **Kecepatan hash password.** Jalankan fungsi `ujiKecepatanHash` dari editor. Idealnya satu hash memakan 300-1500 ms; bila lebih dari 2500 ms turunkan `HASH_ITER` pada `CFG`.
 
-Setiap perubahan `Code.gs` perlu di-deploy sebagai **New version** pada deployment yang sama agar URL tidak berubah.
+Setiap perubahan `Code.gs` perlu di-deploy sebagai **New version** pada deployment yang sama agar URL tidak berubah. Deployment hanya bisa diperbarui oleh akun yang membuatnya, jadi lakukan dengan akun pemilik backend.
 
 ## Keamanan dan privasi
 
 - Data yang disimpan adalah data lembaga (profil, jumlah santri dan guru berupa angka total, lokasi, kontak pengurus). Tidak ada data individu santri.
 - Kolom bertanda publik saja yang dikirim server ke pengunjung. Kontak pengurus, data tanah, dan catatan internal hanya tampak setelah login sesuai peran.
-- Password disimpan sebagai hash berulang dengan salt. Percobaan login dibatasi, sesi berlaku 8 jam, dan mengganti password mencabut sesi lama.
+- **Password.** Disimpan sebagai hash PBKDF2-HMAC-SHA256 (200.000 putaran) dengan garam unik per akun. Hash dari versi lama otomatis ditingkatkan saat pemiliknya login. Akun operator minimal 12 karakter, admin pondok minimal 10, harus memuat huruf dan angka, dan password yang mudah ditebak ditolak.
+- **Login.** Percobaan salah dibatasi per akun. Perangkat yang pernah berhasil masuk tidak ikut terkunci bila orang lain sengaja salah memasukkan password akun itu. Lama respons login sama untuk akun yang ada maupun tidak.
+- **Sesi.** Berlaku 8 jam dan disimpan hanya selama tab terbuka (bukan permanen di browser). Tombol *Keluar* mencabut semua sesi akun itu di server, begitu pula ganti dan reset password.
+- **Pembatasan peran** dicek di server pada setiap aksi, bukan hanya disembunyikan di tampilan.
+- **Browser.** Content-Security-Policy membatasi sambungan data hanya ke Apps Script dan skrip hanya dari halaman sendiri dan CDN Leaflet (dengan SRI). Halaman tidak mau ditampilkan di dalam bingkai situs lain (anti-clickjacking), kecuali situs `muhammadiyah.or.id`.
+- **Berkas dan tautan.** Unggahan diperiksa isi aslinya, bukan hanya labelnya, dan dibatasi ukuran dan jumlahnya. Server hanya mau membuka tautan pendek Google Maps yang berasal dari domain Google sungguhan.
 - Semua perubahan data tercatat (siapa, kapan, nilai lama dan baru). Tidak ada fitur hapus data pesantren.
 - Klik kanan dan pintasan alat pengembang dinonaktifkan bagi pengguna biasa. Ini hanya penghalang ringan, perlindungan sebenarnya ada di server.
 - Repositori ini tidak memuat rahasia. Kunci penandatangan dan pengaturan lain disimpan di *Script Properties* Apps Script.
 
-Belum ada audit keamanan oleh pihak independen. Bila menemukan kerentanan, mohon laporkan secara tertutup kepada pengelola, bukan lewat *issue* publik.
+Seluruh perlindungan di sisi server bergantung pada akun Google pemilik backend, jadi aktifkan verifikasi dua langkah di akun itu dan batasi siapa yang memegangnya. Aplikasi belum memiliki verifikasi dua langkah sendiri, dan belum ada audit keamanan oleh pihak independen. Bila menemukan kerentanan, mohon laporkan secara tertutup kepada pengelola, bukan lewat *issue* publik.
 
 ## Mode pemeliharaan
 
