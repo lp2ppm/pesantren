@@ -943,6 +943,15 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) { memStore[k] = v; } },
   del(k) { try { localStorage.removeItem(k); } catch (e) { delete memStore[k]; } }
 };
+/* penyimpanan sesi: hanya selama tab/jendela terbuka (token dan cache data tidak tertinggal di komputer bersama) */
+const memSes = {};
+const sesStore = {
+  get(k) { try { return sessionStorage.getItem(k); } catch (e) { return memSes[k] || null; } },
+  set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { memSes[k] = v; } },
+  del(k) { try { sessionStorage.removeItem(k); } catch (e) { delete memSes[k]; } }
+};
+/* bersihkan sisa versi lama: token dan cache data yang dulu disimpan permanen di localStorage */
+(function () { try { localStorage.removeItem('lp2pp.sesi'); Object.keys(localStorage).filter(k => k.indexOf('lp2pp.c.') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) { } })();
 const PROV_SINGKAT = {
   'Kepulauan Bangka Belitung': 'Bangka Belitung', 'Nusa Tenggara Barat': 'NTB', 'Nusa Tenggara Timur': 'NTT',
   'DI Yogyakarta': 'DI Yogyakarta', 'Kepulauan Riau': 'Kepulauan Riau', 'Papua Pegunungan': 'Papua Pegunungan', 'Papua Barat Daya': 'Papua Barat Daya'
@@ -1085,28 +1094,30 @@ const S = { token: null, user: null, pubMeta: null, authMeta: null, cfg: null, c
 })();
 function muatSesi() {
   try {
-    const raw = JSON.parse(store.get('lp2pp.sesi') || 'null');
+    const raw = JSON.parse(sesStore.get('lp2pp.sesi') || 'null');
     if (!raw || !raw.token) return;
     const p = JSON.parse(atob(raw.token.split('.')[0].replace(/-/g, '+').replace(/_/g, '/')));
-    if (!p.e || p.e < Date.now()) { store.del('lp2pp.sesi'); if (typeof cacheBersih === 'function') cacheBersih(); return; }
+    if (!p.e || p.e < Date.now()) { sesStore.del('lp2pp.sesi'); if (typeof cacheBersih === 'function') cacheBersih(); return; }
     S.token = raw.token; S.user = raw.user;
-  } catch (e) { store.del('lp2pp.sesi'); }
+  } catch (e) { sesStore.del('lp2pp.sesi'); }
 }
-function simpanSesi(token, user) { S.token = token; S.user = user; store.set('lp2pp.sesi', JSON.stringify({ token, user })); }
+function simpanSesi(token, user) { S.token = token; S.user = user; sesStore.set('lp2pp.sesi', JSON.stringify({ token, user })); }
 function hapusDraf() {
   try { const em = S.user && (S.user.email || S.user.id_user); if (!em) return; const pre = 'lp2pp.draf.' + em + '.'; Object.keys(localStorage).filter(k => k.indexOf(pre) === 0).forEach(k => localStorage.removeItem(k)); } catch (e) { }
 }
-function keluar(pesan) {
+function keluar(pesan, sesiSudahBerakhir) {
+  /* cabut sesi di server (semua token akun ini) tanpa menunggu jawabannya; dilewati bila server sendiri yang menyatakan sesi sudah berakhir */
+  if (S.token && !sesiSudahBerakhir) { try { fetch(CONFIG.API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'logout', token: S.token }), keepalive: true }).catch(() => { }); } catch (e) { } }
   cacheBersih();
   if (S.cfgDraftAktif) buangDraf();
-  S.token = null; S.user = null; S.authMeta = null; store.del('lp2pp.sesi');
+  S.token = null; S.user = null; S.authMeta = null; sesStore.del('lp2pp.sesi');
   if (pesan) toast(pesan);
   go('/');
   renderNav();
 }
 const PUBLIC_ACTIONS = new Set(['ping', 'publicMeta', 'publicList', 'publicProfile', 'publicStats', 'publicKab', 'refKab', 'refKec', 'petaTitik', 'pemeliharaan']);
 /* ---- cache data di browser (5 menit) ----
-   Hasil baca dari server disimpan di localStorage, dikunci per pengguna + aksi + parameter.
+   Hasil baca dari server disimpan di sessionStorage (hilang saat tab ditutup), dikunci per pengguna + aksi + parameter.
    Setiap aksi tulis menghapus seluruh cache; tombol "Perbarui data" juga menghapusnya. */
 const CACHE_TTL = 5 * 60 * 1000, CACHE_PRE = 'lp2pp.c.', CACHE_MAKS = 400000;
 const CACHE_AKSI = new Set(['publicMeta', 'publicList', 'publicProfile', 'publicStats', 'publicKab', 'refKab', 'refKec', 'meta', 'get', 'list', 'stats', 'listUsers', 'reviewList', 'logList', 'listUndangan', 'rekapPembaruan', 'petaTitik']);
@@ -1117,25 +1128,25 @@ function cacheKey(action, params) {
   return CACHE_PRE + (S.user ? S.user.id_user : 'p') + '.' + action + '.' + (h >>> 0).toString(36) + '.' + j.length;
 }
 function cacheBaca(k) {
-  let raw = cacheMem[k]; if (raw === undefined) { try { raw = localStorage.getItem(k); } catch (e) { raw = null; } }
+  let raw = cacheMem[k]; if (raw === undefined) { try { raw = sessionStorage.getItem(k); } catch (e) { raw = null; } }
   if (!raw) return null;
   try { const o = JSON.parse(raw); if (o && Date.now() - o.t < CACHE_TTL && o.t <= Date.now() + 60000) return o; } catch (e) { }
-  delete cacheMem[k]; try { localStorage.removeItem(k); } catch (e) { }
+  delete cacheMem[k]; try { sessionStorage.removeItem(k); } catch (e) { }
   return null;
 }
 function cacheHapusKadaluarsa() {
-  try { Object.keys(localStorage).filter(k => k.indexOf(CACHE_PRE) === 0).forEach(k => { let ok = false; try { ok = Date.now() - JSON.parse(localStorage.getItem(k)).t < CACHE_TTL; } catch (e) { } if (!ok) localStorage.removeItem(k); }); } catch (e) { }
+  try { Object.keys(sessionStorage).filter(k => k.indexOf(CACHE_PRE) === 0).forEach(k => { let ok = false; try { ok = Date.now() - JSON.parse(sessionStorage.getItem(k)).t < CACHE_TTL; } catch (e) { } if (!ok) sessionStorage.removeItem(k); }); } catch (e) { }
 }
 function cacheTulis(k, data) {
   let raw; try { raw = JSON.stringify({ t: Date.now(), d: data }); } catch (e) { return; }
   if (raw.length > CACHE_MAKS) return;
   cacheMem[k] = raw;
-  try { localStorage.setItem(k, raw); }
-  catch (e) { cacheHapusKadaluarsa(); try { localStorage.setItem(k, raw); } catch (e2) { } }
+  try { sessionStorage.setItem(k, raw); }
+  catch (e) { cacheHapusKadaluarsa(); try { sessionStorage.setItem(k, raw); } catch (e2) { } }
 }
 function cacheBersih() {
   Object.keys(cacheMem).forEach(k => { delete cacheMem[k]; });
-  try { Object.keys(localStorage).filter(k => k.indexOf(CACHE_PRE) === 0).forEach(k => localStorage.removeItem(k)); } catch (e) { }
+  try { Object.keys(sessionStorage).filter(k => k.indexOf(CACHE_PRE) === 0).forEach(k => sessionStorage.removeItem(k)); } catch (e) { }
 }
 function catatSumber(t, dariCache) { const m = S.sumber; if (!m) return; if (!m.t || t < m.t) m.t = t; if (dariCache) m.cache = true; }
 async function api(action, params, opsi) {
@@ -1169,7 +1180,7 @@ async function apiJaringan(action, params) {
   try { j = await res.json(); } catch (e) { throw new Error('Server memberi jawaban yang tidak dikenali. Coba lagi beberapa saat.'); }
   if (!j.ok) {
     const er = new Error(j.error || 'Terjadi kesalahan.'); er.code = j.code; er.kode = j.kode;
-    if (j.code === 401 && S.token && j.kode === 'SESI') { keluar('Sesi berakhir. Silakan masuk kembali.'); er.ditangani = true; }
+    if (j.code === 401 && S.token && j.kode === 'SESI') { keluar('Sesi berakhir. Silakan masuk kembali.', true); er.ditangani = true; }
     if (j.kode === 'GANTI_PASSWORD') { go('/ganti-password'); er.ditangani = true; }
     if (j.kode === 'PEMELIHARAAN' && action !== 'login') { er.ditangani = true; er.pemeliharaan = true; if (!(S.pml && S.pml.aktif)) { S.pml = { aktif: true, pesan: j.error || '', perkiraan: '', sejak: '' }; setTimeout(() => { renderNav(); render(); cekPemeliharaan(); }, 0); } }
     throw er;
