@@ -2149,7 +2149,7 @@ async function pageGantiPassword({ el }) {
     ${wajib ? '<p class="info kecil" style="margin-top:12px">Anda memakai password sementara. Buat password baru sebelum melanjutkan.</p>' : ''}
     <form id="f-gp" novalidate>
       <div class="fl"><label for="g-lama">Password lama</label><input id="g-lama" type="password" autocomplete="current-password" required></div>
-      <div class="fl"><label for="g-baru">Password baru</label><input id="g-baru" type="password" autocomplete="new-password" required><span class="hint">Minimal 10 karakter, memuat huruf dan angka.</span></div>
+      <div class="fl"><label for="g-baru">Password baru</label><input id="g-baru" type="password" autocomplete="new-password" required><span class="hint">Minimal ${isStaff() ? 12 : 10} karakter, memuat huruf dan angka, dan tidak mudah ditebak.</span></div>
       <div class="fl"><label for="g-ulang">Ulangi password baru</label><input id="g-ulang" type="password" autocomplete="new-password" required></div>
       <div id="g-err" class="galat" role="alert" style="margin:0;display:none"></div>
       <button class="btn" type="submit">Simpan password baru</button>
