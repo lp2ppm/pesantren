@@ -2,6 +2,31 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
+<!-- Pembatas sumber: skrip hanya dari halaman ini dan CDN Leaflet; sambungan data hanya ke Apps Script; tanpa bingkai, objek, atau formulir ke luar.
+     (Perlindungan clickjacking ada di skrip di bawah, karena meta CSP tidak mendukung frame-ancestors.) -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://*.googleusercontent.com; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<style id="anti-bingkai">html{visibility:hidden}</style>
+<script>
+/* Anti-clickjacking: halaman hanya tampil bila berdiri sendiri atau dibingkai situs muhammadiyah.or.id / lp2ppm.github.io. */
+(function () {
+  var ok = false, awal = document.getElementById('anti-bingkai');
+  try {
+    if (window.top === window.self) ok = true;
+    else {
+      var asal = location.ancestorOrigins && location.ancestorOrigins.length ? Array.prototype.slice.call(location.ancestorOrigins) : [document.referrer].filter(Boolean);
+      ok = asal.length > 0 && asal.every(function (o) { var h = ''; try { h = new URL(o).hostname; } catch (e) { } return h === 'lp2ppm.github.io' || h === 'muhammadiyah.or.id' || /\.muhammadiyah\.or\.id$/.test(h); });
+    }
+  } catch (e) { ok = false; }
+  if (ok) { awal.remove(); return; }
+  awal.textContent = 'html{visibility:visible}body>*:not(#info-bingkai){display:none!important}body{background:#fff;font:16px/1.5 system-ui,sans-serif;color:#14211b}#info-bingkai{max-width:520px;margin:12vh auto;padding:0 20px}';
+  document.addEventListener('DOMContentLoaded', function () {
+    var d = document.createElement('div'); d.id = 'info-bingkai';
+    d.innerHTML = '<h1 style="font-size:1.3rem">Halaman tidak dapat ditampilkan di sini</h1><p>Demi keamanan, Data Pesantren Muhammadiyah tidak boleh dibuka di dalam bingkai situs lain.</p><p><a target="_blank" rel="noopener" href="' + location.href.replace(/[&<>"']/g, '') + '">Buka di jendela baru</a></p>';
+    document.body.appendChild(d);
+  });
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Data Pesantren Muhammadiyah</title>
 <meta name="description" id="meta-desc" content="Direktori dan basis data pesantren Muhammadiyah se-Indonesia, dikelola LP2 PPM.">
@@ -950,6 +975,14 @@ const sesStore = {
   set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { memSes[k] = v; } },
   del(k) { try { sessionStorage.removeItem(k); } catch (e) { delete memSes[k]; } }
 };
+/* pengenal perangkat (acak, dibuat sekali): dikirim saat masuk agar server bisa mengenali perangkat yang pernah berhasil masuk */
+function perangkatId() {
+  let d = store.get('lp2pp.dev');
+  if (d && /^[A-Za-z0-9]{16,48}$/.test(d)) return d;
+  try { const b = new Uint8Array(18); crypto.getRandomValues(b); d = Array.from(b, x => (x % 36).toString(36)).join(''); } catch (e) { d = ''; for (let i = 0; i < 24; i++) d += Math.floor(Math.random() * 36).toString(36); }
+  d = d.length >= 16 ? d : (d + '0123456789abcdef');
+  store.set('lp2pp.dev', d); return d;
+}
 /* bersihkan sisa versi lama: token dan cache data yang dulu disimpan permanen di localStorage */
 (function () { try { localStorage.removeItem('lp2pp.sesi'); Object.keys(localStorage).filter(k => k.indexOf('lp2pp.c.') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) { } })();
 const PROV_SINGKAT = {
@@ -2098,7 +2131,7 @@ async function pageMasuk({ el }) {
     const b = $('button[type=submit]', el), er = $('#m-err');
     er.style.display = 'none'; b.disabled = true; b.textContent = 'Memeriksa…';
     try {
-      const d = await api('login', { email: $('#m-email').value, password: $('#m-pw').value });
+      const d = await api('login', { email: $('#m-email').value, password: $('#m-pw').value, dev: perangkatId() });
       simpanSesi(d.token, d.user); renderNav();
       if (d.user.wajib_ganti) { toast('Ganti password Anda terlebih dahulu.'); go('/ganti-password'); return; }
       toast('Selamat datang, ' + d.user.nama + '.');
@@ -2166,7 +2199,7 @@ async function pageToken({ el, ok }) {
       const er = $('#tk-err'), b = $('button[type=submit]', el); er.style.display = 'none';
       if (i.value.replace(/-/g, '').length !== 12) { er.textContent = 'Token terdiri dari 12 huruf dan angka, contoh ABCD-EFGH-JKLM.'; er.style.display = 'block'; return; }
       b.disabled = true; b.textContent = 'Memeriksa…';
-      try { const d = await api('undanganMasuk', { token: i.value }); undSimpan(i.value); layar(d); }
+      try { const d = await api('undanganMasuk', { token: i.value, dev: perangkatId() }); undSimpan(i.value); layar(d); }
       catch (x) { er.textContent = x.message; er.style.display = 'block'; b.disabled = false; b.textContent = 'Lanjutkan'; }
     };
   };
@@ -2199,8 +2232,8 @@ async function pageToken({ el, ok }) {
       if ($('#u-pw').value !== $('#u-pw2').value) { tampil('Password dan ulangannya tidak sama.'); return; }
       b.disabled = true; b.textContent = 'Mengirim…';
       try {
-        await api('undanganKirim', { token: undBaca(), email: $('#u-em').value.trim(), nama_admin: $('#u-nm').value.trim(), nama_pondok: $('#u-pd').value.trim(), password: $('#u-pw').value });
-        layar(await api('undanganMasuk', { token: undBaca() }));
+        await api('undanganKirim', { token: undBaca(), dev: perangkatId(), email: $('#u-em').value.trim(), nama_admin: $('#u-nm').value.trim(), nama_pondok: $('#u-pd').value.trim(), password: $('#u-pw').value });
+        layar(await api('undanganMasuk', { token: undBaca(), dev: perangkatId() }));
       } catch (x) { tampil(x.message); b.disabled = false; b.textContent = 'Kirim untuk disetujui'; }
     };
   };
@@ -2211,7 +2244,7 @@ async function pageToken({ el, ok }) {
       <dl class="und-data" style="margin-top:14px"><dt>Pesantren</dt><dd>${esc(d.nama_pesantren)} (${esc(d.id_pesantren)})</dd><dt>Email admin</dt><dd>${esc(d.email)}</dd><dt>Nama admin</dt><dd>${esc(d.nama_admin)}</dd><dt>Nama pondok</dt><dd>${esc(d.nama_pondok)}</dd><dt>Dikirim</dt><dd>${esc(d.diajukan_pada)}</dd></dl>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px"><button class="btn" id="u-cek" type="button">Periksa status</button><button class="btn sek" id="u-batal" type="button">Tutup</button></div>`);
     $('#u-batal').onclick = keluarToken;
-    $('#u-cek').onclick = async () => { try { const n = await api('undanganMasuk', { token: undBaca() }); if (n.status === 'diajukan') toast('Masih menunggu persetujuan.'); else layar(n); } catch (x) { toast(x.message, 'galat'); } };
+    $('#u-cek').onclick = async () => { try { const n = await api('undanganMasuk', { token: undBaca(), dev: perangkatId() }); if (n.status === 'diajukan') toast('Masih menunggu persetujuan.'); else layar(n); } catch (x) { toast(x.message, 'galat'); } };
   };
 
   const layarSetuju = d => {
@@ -2226,7 +2259,7 @@ async function pageToken({ el, ok }) {
   const t = undBaca();
   if (!t) { layarMasuk(); return; }
   kartu(muat());
-  try { const d = await api('undanganMasuk', { token: t }); if (!ok()) return; layar(d); }
+  try { const d = await api('undanganMasuk', { token: t, dev: perangkatId() }); if (!ok()) return; layar(d); }
   catch (x) { if (!ok()) return; undSimpan(''); layarMasuk(x.message); }
 }
 
