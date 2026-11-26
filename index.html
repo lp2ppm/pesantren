@@ -893,7 +893,7 @@ dialog.dlg[open]::backdrop{animation:munculSaja .2s both}
 .berkas-list .aksi-b{display:flex;gap:8px;flex-wrap:wrap;flex:none}
 </style>
 <script>
-const LOGO_CADANGAN=['https://daeng923.github.io/pesantren/warna.png','https://raw.githubusercontent.com/daeng923/pesantren/main/warna.png'];
+const LOGO_CADANGAN=['https://lp2ppm.github.io/pesantren/warna.png','https://raw.githubusercontent.com/lp2ppm/pesantren/main/warna.png'];
 function logoGagal(img){const n=+(img.dataset.n||0);if(/warna\.png/.test(img.src)&&n<LOGO_CADANGAN.length){img.dataset.n=n+1;img.src=LOGO_CADANGAN[n];}else{const k=img.closest('.logo-kotak');if(k)k.style.display='none';else img.remove();}}
 </script>
 </head>
@@ -1110,7 +1110,7 @@ const PUBLIC_ACTIONS = new Set(['ping', 'publicMeta', 'publicList', 'publicProfi
    Setiap aksi tulis menghapus seluruh cache; tombol "Perbarui data" juga menghapusnya. */
 const CACHE_TTL = 5 * 60 * 1000, CACHE_PRE = 'lp2pp.c.', CACHE_MAKS = 400000;
 const CACHE_AKSI = new Set(['publicMeta', 'publicList', 'publicProfile', 'publicStats', 'publicKab', 'refKab', 'refKec', 'meta', 'get', 'list', 'stats', 'listUsers', 'reviewList', 'logList', 'listUndangan', 'rekapPembaruan', 'petaTitik']);
-const AKSI_TULIS = new Set(['update', 'create', 'verify', 'uploadDoc', 'deleteDoc', 'setSampul', 'saveUser', 'resetPassword', 'reviewMark', 'saveConfig', 'uploadAsset', 'simpanIsian', 'tambahIsian', 'buatUndangan', 'putuskanUndangan', 'changePassword', 'verifyBulk', 'petaSet', 'petaProses', 'setPemeliharaan']);
+const AKSI_TULIS = new Set(['update', 'create', 'verify', 'uploadDoc', 'deleteDoc', 'setSampul', 'saveUser', 'resetPassword', 'deleteUser', 'reviewMark', 'saveConfig', 'uploadAsset', 'simpanIsian', 'tambahIsian', 'buatUndangan', 'putuskanUndangan', 'changePassword', 'verifyBulk', 'petaSet', 'petaProses', 'setPemeliharaan']);
 const cacheMem = {}, cacheJalan = {};
 function cacheKey(action, params) {
   const j = JSON.stringify(params || {}); let h = 5381; for (let i = 0; i < j.length; i++) h = ((h << 5) + h + j.charCodeAt(i)) | 0;
@@ -2859,7 +2859,7 @@ async function pagePengguna({ el, ok }) {
     <div class="hasil-info"><span><b>${users.length}</b> akun</span></div>
     <div class="tabel-bungkus"><table class="tbl"><thead><tr><th>Nama</th><th>Email</th><th>Peran</th><th>Pesantren / cakupan</th><th>Status</th><th>Login terakhir</th><th></th></tr></thead><tbody>
     ${users.map(u => `<tr><td>${esc(u.nama)}</td><td class="potong">${esc(u.email)}</td><td>${esc(ROLE_LABEL[u.role] || u.role)}</td><td class="${u.id_pesantren ? 'nowrap' : ''}">${u.id_pesantren ? `<a href="#/pesantren/${esc(u.id_pesantren)}">${esc(u.id_pesantren)}</a>` : (wilTeks(u) || '<span class="muted">—</span>')}</td><td><span class="chip ${u.aktif ? '' : 'merah'}">${u.aktif ? 'Aktif' : 'Nonaktif'}</span>${u.wajib_ganti ? ' <span class="chip emas">Password sementara</span>' : ''}</td><td class="nowrap">${esc(u.login_terakhir) || '<span class="muted">Belum pernah</span>'}</td>
-      <td class="nowrap">${pesanSaya(u) ? '<span class="muted kecil">Akun Anda</span>' : `<button class="btn sek kecil" type="button" data-reset="${esc(u.id_user)}" data-e="${esc(u.email)}">Reset password</button> <button class="btn ${u.aktif ? 'bahaya' : 'sek'} kecil" type="button" data-aktif="${esc(u.id_user)}" data-to="${u.aktif ? '0' : '1'}">${u.aktif ? 'Nonaktifkan' : 'Aktifkan'}</button>`}</td></tr>`).join('')}
+      <td class="nowrap">${pesanSaya(u) ? '<span class="muted kecil">Akun Anda</span>' : `<button class="btn sek kecil" type="button" data-reset="${esc(u.id_user)}" data-e="${esc(u.email)}">Reset password</button> <button class="btn ${u.aktif ? 'bahaya' : 'sek'} kecil" type="button" data-aktif="${esc(u.id_user)}" data-to="${u.aktif ? '0' : '1'}">${u.aktif ? 'Nonaktifkan' : 'Aktifkan'}</button> <button class="btn bahaya kecil" type="button" data-hapus-akun="${esc(u.id_user)}" data-e="${esc(u.email)}" aria-label="Hapus akun ${esc(u.email)}">Hapus</button>`}</td></tr>`).join('')}
     </tbody></table></div></div>`;
   pasangAutocomplete($('#u-pes-bungkus'), '#u-pes', '#u-pes-id');
   if (sa) pasangUndangan(el);
@@ -2887,11 +2887,16 @@ async function pagePengguna({ el, ok }) {
       render();
     } catch (x) { if (!x.ditangani) { er.textContent = x.message; er.style.display = 'block'; } b.disabled = false; }
   };
-  el.addEventListener('click', async e => {
-    const rs = e.target.closest('[data-reset]'), ak = e.target.closest('[data-aktif]');
+  el.onclick = async e => {
+    const rs = e.target.closest('[data-reset]'), ak = e.target.closest('[data-aktif]'), hp = e.target.closest('[data-hapus-akun]');
     if (rs) {
       if (!await konfirmasi('Reset password?', `Password ${rs.dataset.e} diganti dengan password sementara. Password lama tidak berlaku lagi.`, 'Reset password', true)) return;
       try { const r = await api('resetPassword', { id_user: rs.dataset.reset }); tampilRahasia('Password direset', 'Berikan password sementara ini kepada pemilik akun.', r.email, r.password_awal); }
+      catch (x) { toast(x.message, 'galat'); }
+    }
+    if (hp) {
+      if (!await konfirmasi('Hapus akun?', `Akun ${hp.dataset.e} dihapus permanen dan tidak bisa dikembalikan. Data pesantren tidak ikut terhapus, dan riwayat perubahan tetap tersimpan.`, 'Hapus akun', true)) return;
+      try { await api('deleteUser', { id_user: hp.dataset.hapusAkun }); toast('Akun dihapus.'); render(); }
       catch (x) { toast(x.message, 'galat'); }
     }
     if (ak) {
@@ -2900,7 +2905,7 @@ async function pagePengguna({ el, ok }) {
       try { await api('saveUser', { id_user: ak.dataset.aktif, aktif }); toast(aktif ? 'Akun diaktifkan.' : 'Akun dinonaktifkan.'); render(); }
       catch (x) { toast(x.message, 'galat'); }
     }
-  });
+  };
 }
 
 async function pageReview({ el, q, ok }) {
